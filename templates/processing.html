@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Обработка…</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='logo2.ico') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+  <main class="page" data-page="processing" data-job-id="{{ job_id }}">
+    <div class="card">
+      <h2 class="card-title">Идёт обработка…</h2>
+      <p class="card-hint">Пожалуйста, подождите окончания операции.</p>
+      <p class="footer-note" id="status_text">Статус: выполняется…</p>
+    </div>
+  </main>
+
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

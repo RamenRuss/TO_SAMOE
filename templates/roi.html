@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Выбор области</title>
+
+  <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='logo2.ico') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+  <main class="page" data-page="roi" data-job-id="{{ job_id }}">
+    <div class="card">
+      <h2 class="card-title">Выбор области (ROI)</h2>
+      <p class="card-hint">
+        Выдели прямоугольник на видео (можно двигать и менять размер) и нажми «Подтвердить».
+      </p>
+
+      <div class="roi-wrap" id="roi_wrap">
+        <video
+          id="roi_video"
+          class="result-video"
+          controls
+          preload="metadata"
+          src="{{ url_for('video', job_id=job_id) }}"
+        ></video>
+
+        <!-- затемнение вокруг области -->
+        <div class="roi-dim" aria-hidden="true">
+          <div class="roi-dim-top"></div>
+          <div class="roi-dim-left"></div>
+          <div class="roi-dim-right"></div>
+          <div class="roi-dim-bottom"></div>
+        </div>
+
+        <!-- прямоугольник ROI -->
+        <div id="roi_box" class="roi-box" role="application" aria-label="ROI selection">
+          <div class="roi-handle nw" data-h="nw"></div>
+          <div class="roi-handle n"  data-h="n"></div>
+          <div class="roi-handle ne" data-h="ne"></div>
+
+          <div class="roi-handle w"  data-h="w"></div>
+          <div class="roi-handle e"  data-h="e"></div>
+
+          <div class="roi-handle sw" data-h="sw"></div>
+          <div class="roi-handle s"  data-h="s"></div>
+          <div class="roi-handle se" data-h="se"></div>
+        </div>
+      </div>
+
+      <form id="roi_form" class="roi-form" method="post" action="/roi/{{ job_id }}">
+        <input type="hidden" name="x" id="roi_x">
+        <input type="hidden" name="y" id="roi_y">
+        <input type="hidden" name="w" id="roi_w">
+        <input type="hidden" name="h" id="roi_h">
+
+        <div class="roi-actions">
+          <button class="btn roi-btn" type="submit">Подтвердить область</button>
+          <a class="btn roi-btn roi-btn--ghost" href="/">Отмена</a>
+        </div>
+      </form>
+
+      <p class="footer-note">
+        Совет: поставь видео на паузу, выбери область, затем подтверждай.
+      </p>
+    </div>
+
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+  </main>
+</body>
+</html>

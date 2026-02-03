@@ -1,0 +1,89 @@
+<!-- templates/result.html -->
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Результат</title>
+
+  <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='logo2.ico') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+  <main
+    class="page"
+    data-page="result"
+    data-status="{{ job.status }}"
+    data-job-id="{{ job_id }}"
+    data-markers='{{ (job.timestamps or []) | tojson }}'
+  >
+    <div class="card result-card">
+      <h2 class="card-title">Результаты</h2>
+
+      <!-- Тексты статуса: app.js будет обновлять -->
+      <p class="card-hint" id="status_text">
+        {% if job.status == "error" %}
+          Ошибка ❌
+        {% elif job.status == "done" %}
+          Обработка закончена ✅
+        {% else %}
+          Идёт обработка…
+        {% endif %}
+      </p>
+
+      <p class="footer-note" id="status_subtext">
+        {% if job.status == "error" %}
+          {{ job.error }}
+        {% elif job.status == "done" %}
+          Таймкоды отмечены на таймлайне. Можно переходить по списку.
+        {% else %}
+          Первые таймкоды появятся по мере готовности.
+        {% endif %}
+      </p>
+
+      <p class="footer-note" id="progress_text">
+        {% if job.status == "done" %}
+          100%
+        {% else %}
+          0%
+        {% endif %}
+      </p>
+
+      <p class="card-hint">Найденные моменты (кликни, чтобы перейти):</p>
+      <ul class="tc-list" id="tc_list"></ul>
+
+      <div class="video-wrap">
+        <video
+          id="result_video"
+          class="result-video"
+          controls
+          preload="metadata"
+          src="{{ url_for('video', job_id=job_id) }}"
+        ></video>
+      </div>
+
+      <div class="timeline" id="timeline">
+        <div class="timeline-track">
+          <input class="timeline-range" id="video_seek" type="range" min="0" max="1000" value="0" step="1">
+          <div class="timeline-markers" id="timeline_markers"></div>
+        </div>
+
+        <div class="timeline-meta">
+          <span id="cur_time">0:00</span>
+          <span class="dot">•</span>
+          <span id="dur_time">0:00</span>
+        </div>
+
+        <p class="footer-note">Можно тянуть ползунок или кликать по меткам таймкодов.</p>
+      </div>
+
+      <div class="result-actions">
+        <a class="btn" href="/">На главную</a>
+      </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+  </main>
+</body>
+</html>

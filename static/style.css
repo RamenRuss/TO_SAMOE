@@ -1,0 +1,914 @@
+:root{
+  --bg: #0b1020;                 /* фон страницы */
+  --card: rgba(255,255,255,0.06);/* фон карточек */
+  --text: #e7eaf3;               /* основной текст */
+  --muted: rgba(231,234,243,0.70);/* вторичный текст */
+  --line: rgba(231,234,243,0.10); /* границы */
+
+  --accent: #7aa2ff;             /* акцент */
+  --accent-soft: rgba(122,162,255,0.20);
+
+  --radius: 16px;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  margin: 0;
+}
+
+body{
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, "Noto Sans", "Helvetica Neue", sans-serif;
+  color: var(--text);
+  background:
+    radial-gradient(900px 500px at 15% 10%, rgba(122,162,255,0.18) 0%, transparent 60%),
+    radial-gradient(900px 500px at 85% 20%, rgba(84,214,167,0.12) 0%, transparent 55%),
+    var(--bg);
+}
+
+.page{
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 28px 18px 36px;
+}
+
+.header{
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.title{
+  margin: 0;
+  font-size: 28px;
+  letter-spacing: -0.02em;
+}
+
+.subtitle{
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.card{
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 18px 18px 16px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+  margin: 12px 0;
+}
+
+.card-title{
+  margin: 0;
+  font-size: 18px;
+}
+
+.card-hint{
+  margin: 8px 0 14px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.field{
+  display: grid;
+  gap: 8px;
+}
+
+.field-label{
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.select{
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--text);
+  outline: none;
+}
+
+.select:focus{
+  border-color: rgba(59, 130, 246, 0.55);
+  box-shadow: 0 0 0 4px var(--accent-soft);
+}
+
+/* карточки выбора Да/Нет */
+.radio{
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.9);
+  cursor: pointer;
+  user-select: none;
+
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease, background 160ms ease;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
+}
+
+
+.divider{
+  height: 1px;
+  background: var(--line);
+  margin: 14px 0;
+}
+
+.btn{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 12px;
+  padding: 10px 14px;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+  font-weight: 600;
+  margin-top: 12px;
+}
+
+.btn:hover{
+  filter: brightness(0.96);
+}
+
+.footer-note{
+  margin: 10px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.footer{
+  margin-top: 14px;
+  color: var(--muted);
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: center;
+}
+
+.dot{ opacity: 0.7; }
+
+.brand-logo{
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+}
+
+.input-wrap{
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+/* иконка слева внутри поля */
+.input-icon{
+  position: absolute;
+  left: 12px;
+  font-size: 14px;
+  color: var(--muted);
+  opacity: 0.85;
+  pointer-events: none;
+}
+
+/* красивый инпут */
+.input--pretty{
+  width: 100%;
+  padding: 11px 12px 11px 36px; /* слева больше места под иконку */
+  border-radius: 14px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--text);
+  outline: none;
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease, background 160ms ease;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
+}
+
+/* лёгкий hover */
+.input--pretty:hover{
+  background: #ffffff;
+  border-color: rgba(15, 23, 42, 0.16);
+}
+
+/* фокус: мягкое свечение */
+.input--pretty:focus{
+  border-color: rgba(59, 130, 246, 0.60);
+  box-shadow: 0 0 0 4px var(--accent-soft), 0 12px 30px rgba(15, 23, 42, 0.08);
+  transform: translateY(-1px);
+}
+
+/* красивый placeholder */
+.input--pretty::placeholder{
+  color: rgba(91, 100, 117, 0.75);
+}
+
+/* текст подсказки под полем */
+.field-help{
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.file-wrap{
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease, background 160ms ease;
+}
+
+.file-wrap:hover{
+  background: #ffffff;
+  border-color: rgba(15, 23, 42, 0.16);
+  transform: translateY(-1px);
+}
+
+.file-wrap:focus-within{
+  border-color: rgba(59, 130, 246, 0.60);
+  box-shadow: 0 0 0 4px var(--accent-soft), 0 12px 30px rgba(15, 23, 42, 0.08);
+}
+
+/* скрываем настоящий input, кликаем по label-кнопке */
+.file-input{
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.file-btn{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 9px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  background: #fff;
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--text);
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease, background 160ms ease;
+}
+
+.file-btn:hover{
+  border-color: rgba(15, 23, 42, 0.18);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
+  transform: translateY(-1px);
+}
+
+.file-btn:active{
+  transform: translateY(0px);
+}
+
+/* текст справа с именем файла */
+.file-name{
+  font-size: 13px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.file-btn.is-disabled{
+  opacity: 0.65;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+  border-color: rgba(15, 23, 42, 0.10);
+}
+
+/* состояние: файл выбран */
+.file-btn.is-selected{
+  border-color: rgba(59, 130, 246, 0.35);
+  background: rgba(59, 130, 246, 0.08);
+}
+
+/* -------------------- Dark theme finishing (override) -------------------- */
+
+/* Чуть более "правильные" тени для тёмного фона */
+.card{
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.38);
+  backdrop-filter: blur(8px);
+}
+
+/* Общие "поверхности" (инпуты/плашки) */
+.select,
+.input--pretty,
+.file-wrap{
+  background: rgba(255, 255, 255, 0.06) !important;
+  border: 1px solid var(--line) !important;
+  color: var(--text);
+}
+
+/* Hover: чуть светлее */
+.select:hover,
+.input--pretty:hover,
+.file-wrap:hover{
+  background: rgba(255, 255, 255, 0.08) !important;
+  border-color: rgba(231, 234, 243, 0.16) !important;
+  transform: translateY(-1px);
+}
+
+/* Focus: единый стиль подсветки */
+.select:focus,
+.input--pretty:focus{
+  border-color: rgba(122, 162, 255, 0.65) !important;
+  box-shadow: 0 0 0 4px var(--accent-soft), 0 16px 44px rgba(0, 0, 0, 0.35) !important;
+}
+
+/* Focus для file-wrap (когда внутри выбран input) */
+.file-wrap:focus-within{
+  border-color: rgba(122, 162, 255, 0.65) !important;
+  box-shadow: 0 0 0 4px var(--accent-soft), 0 16px 44px rgba(0, 0, 0, 0.35) !important;
+}
+
+/* Placeholder в тёмной теме */
+.input--pretty::placeholder{
+  color: rgba(231, 234, 243, 0.55);
+}
+
+/* Кнопки выбора файла */
+.file-btn{
+  background: rgba(255, 255, 255, 0.10) !important;
+  border: 1px solid var(--line) !important;
+  color: var(--text) !important;
+  box-shadow: none;
+}
+
+.file-btn:hover{
+  background: rgba(255, 255, 255, 0.14) !important;
+  border-color: rgba(231, 234, 243, 0.18) !important;
+}
+
+.file-btn.is-selected{
+  border-color: rgba(122, 162, 255, 0.45) !important;
+  background: rgba(122, 162, 255, 0.16) !important;
+}
+
+/* Кнопка (основная) — слегка "стеклянная", но акцентная */
+.btn{
+  background: linear-gradient(180deg, rgba(122, 162, 255, 0.95), rgba(122, 162, 255, 0.78));
+  box-shadow: 0 16px 46px rgba(0, 0, 0, 0.35);
+}
+
+.btn:hover{
+  filter: brightness(1.02);
+}
+
+/* Радио: выбранное состояние — тёмное, но с акцентом */
+.radio:has(input:checked){
+  background: rgba(122, 162, 255, 0.12) !important;
+  border-color: rgba(122, 162, 255, 0.55) !important;
+  box-shadow: 0 0 0 4px var(--accent-soft), 0 16px 44px rgba(0, 0, 0, 0.35) !important;
+}
+
+/* Мелкие тексты/иконки */
+.input-icon{
+  color: rgba(231, 234, 243, 0.70);
+}
+
+.file-name,
+.field-help,
+.subtitle,
+.card-hint,
+.footer{
+  color: var(--muted);
+}
+
+/* Лого — чуть “стеклянное” на тёмном */
+.brand-logo{
+  background: rgba(255, 255, 255, 0.10);
+  border: 1px solid var(--line);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
+}
+
+/* Divider в тёмной теме */
+.divider{
+  background: rgba(231, 234, 243, 0.10);
+}
+
+/* Чтобы transform hover не "дёргал" layout на мобильных */
+.select,
+.input--pretty,
+.file-wrap,
+.radio,
+.file-btn{
+  will-change: transform;
+}
+
+.brand{
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.brand-text{
+  display: grid;
+  gap: 2px;
+}
+
+.brand-logo{
+    height: 10%;
+    width: 10%;
+}
+
+/* --- секции полей --- */
+.field-section{
+  margin-top: 18px;
+}
+
+.field-title{
+  margin: 0 0 6px;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: var(--text);
+}
+
+.field-subtitle{
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* --- акцент на полях + hover подсветка --- */
+.file-wrap,
+.input--pretty{
+  background: rgba(255,255,255,0.07) !important;
+  border: 1px solid rgba(231,234,243,0.14) !important;
+  box-shadow: 0 14px 38px rgba(0,0,0,0.35) !important;
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease, background 160ms ease;
+}
+
+/* hover: подсветка как раньше */
+.file-wrap:hover,
+.input--pretty:hover{
+  background: rgba(255,255,255,0.09) !important;
+  border-color: rgba(122,162,255,0.45) !important;
+  box-shadow: 0 0 0 4px rgba(122,162,255,0.14), 0 18px 50px rgba(0,0,0,0.45) !important;
+  transform: translateY(-1px);
+}
+
+/* focus: ещё сильнее */
+.file-wrap:focus-within,
+.input--pretty:focus{
+  border-color: rgba(122,162,255,0.75) !important;
+  box-shadow: 0 0 0 5px rgba(122,162,255,0.22), 0 18px 50px rgba(0,0,0,0.45) !important;
+  transform: translateY(-1px);
+}
+
+/* кнопка ниже секций */
+.btn-gap{
+  margin-top: 18px;
+}
+
+.field-section .btn-gap{
+  margin-top: 8px;
+}
+
+/* --- Detective Web: красивый hover для основной кнопки --- */
+.btn{
+  position: relative;
+  overflow: hidden;
+  transition: transform 160ms ease, box-shadow 160ms ease, filter 160ms ease;
+}
+
+/* внутренний "блик" */
+.btn::before{
+  content: "";
+  position: absolute;
+  inset: -40%;
+  background: radial-gradient(circle at 30% 20%, rgba(255,255,255,0.35), transparent 55%);
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 160ms ease, transform 160ms ease;
+  pointer-events: none;
+}
+
+.btn:hover{
+  transform: translateY(-1px);
+  filter: brightness(1.06) saturate(1.05);
+  box-shadow:
+    0 0 0 5px rgba(122,162,255,0.22),
+    0 22px 60px rgba(0,0,0,0.45);
+}
+
+.btn:hover::before{
+  opacity: 0.55;
+  transform: translateY(0);
+}
+
+.btn:active{
+  transform: translateY(0);
+  filter: brightness(1.02);
+  box-shadow:
+    0 0 0 4px rgba(122,162,255,0.18),
+    0 16px 46px rgba(0,0,0,0.35);
+}
+
+.btn:focus-visible{
+  outline: none;
+  box-shadow:
+    0 0 0 5px rgba(122,162,255,0.28),
+    0 22px 60px rgba(0,0,0,0.45);
+}
+
+/* -------------------- Processing + Result pages -------------------- */
+
+/* чтобы <a class="btn"> выглядел как кнопка */
+a.btn{
+  text-decoration: none;
+}
+
+/* общая компоновка для этих страниц */
+[data-page="processing"] .card,
+[data-page="result"] .card{
+  text-align: center;
+  padding: 22px 18px 18px;
+}
+
+/* загрузчик рядом с заголовком */
+[data-page="processing"] .card-title::after{
+  content: "";
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  margin-left: 10px;
+  border-radius: 999px;
+  border: 2px solid rgba(231,234,243,0.20);
+  border-top-color: rgba(122,162,255,0.95);
+  vertical-align: -2px;
+  animation: dw-spin 0.85s linear infinite;
+}
+
+@keyframes dw-spin{
+  to { transform: rotate(360deg); }
+}
+
+/* "пульс" для текста статуса */
+[data-page="processing"] #status_text{
+  position: relative;
+  display: inline-block;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(231,234,243,0.12);
+  background: rgba(255,255,255,0.05);
+  box-shadow: 0 14px 38px rgba(0,0,0,0.35);
+  margin-top: 6px;
+}
+
+/* бегущие точки после текста */
+[data-page="processing"] #status_text::after{
+  content: "";
+  display: inline-block;
+  width: 18px;
+  margin-left: 6px;
+  text-align: left;
+  animation: dw-dots 1.2s steps(4, end) infinite;
+}
+
+@keyframes dw-dots{
+  0%   { content: ""; }
+  25%  { content: "."; }
+  50%  { content: ".."; }
+  75%  { content: "..."; }
+  100% { content: ""; }
+}
+
+/* --- Result page: статусы --- */
+:root{
+  --ok: #54d6a7;
+  --ok-soft: rgba(84,214,167,0.18);
+  --danger: #ff6b6b;
+  --danger-soft: rgba(255,107,107,0.18);
+}
+
+[data-page="result"][data-status="done"] .card{
+  border-color: rgba(84,214,167,0.28);
+  box-shadow: 0 0 0 4px var(--ok-soft), 0 18px 60px rgba(0,0,0,0.38);
+}
+
+[data-page="result"][data-status="error"] .card{
+  border-color: rgba(255,107,107,0.26);
+  box-shadow: 0 0 0 4px var(--danger-soft), 0 18px 60px rgba(0,0,0,0.38);
+}
+
+/* чуть “крупнее” текст результата */
+[data-page="result"] .card-hint{
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+/* -------------------- Result page UI -------------------- */
+
+.result-card{
+  text-align: left;
+}
+
+.tc-list{
+  list-style: none;
+  padding: 0;
+  margin: 10px 0 14px;
+  display: grid;
+  gap: 8px;
+}
+
+.tc-item{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(231,234,243,0.12);
+  background: rgba(255,255,255,0.05);
+  box-shadow: 0 14px 38px rgba(0,0,0,0.30);
+}
+
+.tc-btn{
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  padding: 0;
+}
+
+.tc-time{
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  color: rgba(231,234,243,0.95);
+}
+
+.tc-jump{
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+.tc-btn:hover .tc-jump{
+  opacity: 1;
+}
+
+.video-wrap{
+  margin-top: 10px;
+}
+
+.result-video{
+  width: 100%;
+  display: block;
+  border-radius: 18px;
+  border: 1px solid rgba(231,234,243,0.12);
+  background: rgba(0,0,0,0.35);
+  box-shadow: 0 18px 60px rgba(0,0,0,0.45);
+}
+
+/* Timeline */
+.timeline{
+  margin-top: 12px;
+}
+
+.timeline-track{
+  position: relative;
+  padding-top: 10px;
+}
+
+.timeline-range{
+  width: 100%;
+  appearance: none;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(231,234,243,0.12);
+  box-shadow: 0 14px 38px rgba(0,0,0,0.28);
+  outline: none;
+}
+
+.timeline-range::-webkit-slider-thumb{
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: rgba(122,162,255,0.95);
+  box-shadow:
+    0 0 0 5px rgba(122,162,255,0.18),
+    0 18px 46px rgba(0,0,0,0.35);
+  border: 1px solid rgba(231,234,243,0.12);
+}
+
+.timeline-range::-moz-range-thumb{
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: rgba(122,162,255,0.95);
+  border: 1px solid rgba(231,234,243,0.12);
+}
+
+.timeline-markers{
+  pointer-events: none;
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 9px;
+  height: 14px;
+}
+
+.timeline-marker{
+  pointer-events: auto;
+  position: absolute;
+  top: -3px;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(84,214,167,0.95);
+  box-shadow: 0 0 0 5px rgba(84,214,167,0.14);
+  transform: translateX(-50%);
+  cursor: pointer;
+}
+
+.timeline-marker:hover{
+  box-shadow: 0 0 0 6px rgba(84,214,167,0.22);
+}
+
+.timeline-meta{
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 10px;
+  color: rgba(231,234,243,0.72);
+  font-size: 13px;
+}
+
+.result-actions{
+  margin-top: 14px;
+}
+
+html, body { overflow-x: hidden; }
+
+.timeline-track{
+  overflow: hidden; /* прячет то, что вылезает за края (метки/тени) */
+}
+
+/* ROI page */
+.roi-wrap{
+  position: relative;
+  margin-top: 10px;
+}
+
+.roi-wrap video{
+  width: 100%;
+  display: block;
+  border-radius: 18px;
+  border: 1px solid rgba(231,234,243,0.12);
+  background: rgba(0,0,0,0.35);
+  box-shadow: 0 18px 60px rgba(0,0,0,0.45);
+}
+
+/* прямоугольник выделения */
+.roi-box{
+  position: absolute;
+  left: 10%;
+  top: 10%;
+  width: 50%;
+  height: 50%;
+  border-radius: 14px;
+  border: 2px solid rgba(122,162,255,0.95);
+  box-shadow: 0 0 0 6px rgba(122,162,255,0.16);
+  background: rgba(122,162,255,0.08);
+  cursor: move;
+  user-select: none;
+}
+
+/* -------------------- ROI resizable -------------------- */
+
+.roi-wrap{
+  position: relative;
+  margin-top: 10px;
+  border-radius: 18px;
+}
+
+/* затемнение вокруг ROI */
+.roi-dim{
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: 18px;
+  overflow: hidden;
+}
+
+.roi-dim > div{
+  position: absolute;
+  background: rgba(0,0,0,0.42);
+}
+
+/* рамка ROI */
+.roi-box{
+  position: absolute;
+  left: 10%;
+  top: 10%;
+  width: 55%;
+  height: 55%;
+  border-radius: 14px;
+  border: 2px solid rgba(122,162,255,0.95);
+  box-shadow: 0 0 0 6px rgba(122,162,255,0.16);
+  background: rgba(122,162,255,0.08);
+  cursor: move;
+  user-select: none;
+  touch-action: none; /* важно для тача */
+}
+
+/* ручки */
+.roi-handle{
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: rgba(231,234,243,0.95);
+  border: 1px solid rgba(231,234,243,0.35);
+  box-shadow: 0 0 0 4px rgba(122,162,255,0.18);
+  cursor: pointer;
+}
+
+/* углы */
+.roi-handle.nw{ left:-7px; top:-7px; cursor:nwse-resize; }
+.roi-handle.ne{ right:-7px; top:-7px; cursor:nesw-resize; }
+.roi-handle.sw{ left:-7px; bottom:-7px; cursor:nesw-resize; }
+.roi-handle.se{ right:-7px; bottom:-7px; cursor:nwse-resize; }
+
+/* стороны */
+.roi-handle.n{ left:50%; top:-7px; transform:translateX(-50%); cursor:ns-resize; }
+.roi-handle.s{ left:50%; bottom:-7px; transform:translateX(-50%); cursor:ns-resize; }
+.roi-handle.w{ left:-7px; top:50%; transform:translateY(-50%); cursor:ew-resize; }
+.roi-handle.e{ right:-7px; top:50%; transform:translateY(-50%); cursor:ew-resize; }
+
+/* ROI: кнопки в один ряд, одинаковая высота и выравнивание */
+#roi_form {
+  display: flex;
+  gap: 12px;
+  align-items: center; /* чтобы были на одном уровне */
+}
+
+/* одинаковые размеры/центрирование для <a> и <button> */
+#roi_form .btn,
+#roi_form button.btn,
+#roi_form a.btn {
+  height: 44px;            /* можешь поставить 46px как нравится */
+  padding: 0 18px;         /* ширина остаётся "как была" за счёт текста */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;          /* убираем разные line-height */
+  vertical-align: middle;
+  box-sizing: border-box;
+}
+
+/* если где-то есть btn-gap, чтобы он не ломал высоту */
+#roi_form .btn.btn-gap {
+  margin-top: 0;
+}
+
+/* ROI: кнопки в один ряд, одинаковая высота/уровень */
+.roi-actions{
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-top: 14px;
+}
+
+.roi-btn{
+  height: 44px;
+  padding: 0 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  box-sizing: border-box;
+  text-decoration: none; /* для <a> */
+}
+
+/* опционально: чуть "тише" кнопка отмены (если у тебя есть стили) */
+.roi-btn--ghost{
+  opacity: .9;
+}
+.roi-btn--ghost:hover{
+  opacity: 1;
+}
+

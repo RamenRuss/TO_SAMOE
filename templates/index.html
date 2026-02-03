@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <title>Detective Web</title>
+
+  <!-- Иконка вкладки -->
+  <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='logo2.ico') }}">
+
+  <!-- Стили -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+  <main class="page">
+    <header class="header">
+      <div class="brand">
+        <img class="brand-logo" src="{{ url_for('static', filename='logo2.ico') }}" alt="Logo">
+        <div class="brand-text">
+          <h1 class="title">Detective Web</h1>
+          <p class="subtitle">Мы покажем все нарушения по вашему запросу</p>
+        </div>
+      </div>
+    </header>
+
+    <form class="card" action="/run" method="post" enctype="multipart/form-data">
+  <h2 class="card-title">Параметры запуска</h2>
+  <p class="card-hint">Выберите видеофайл и задайте текстовый запрос.</p>
+
+  <!-- Секция: файл -->
+  <section class="field-section">
+    <h3 class="field-title">Выбор видео</h3>
+    <p class="field-subtitle">Укажите файл, который нужно обработать.</p>
+
+    <label class="field">
+      <span class="field-label">Видеофайл</span>
+
+      <div class="file-wrap">
+        <input class="file-input" type="file" id="video_file" name="video_file" accept="video/*" required>
+        <label class="file-btn" id="file_btn" for="video_file">Выбрать файл</label>
+        <span class="file-name" id="file_name">Файл не выбран</span>
+      </div>
+
+      <span class="field-help">Поддерживаются mp4, avi, mkv и другие форматы.</span>
+    </label>
+  </section>
+
+  <!-- Секция: текст -->
+  <section class="field-section">
+    <h3 class="field-title">Текстовый запрос</h3>
+    <p class="field-subtitle">Коротко опиши, что нужно найти.</p>
+
+    <label class="field">
+      <span class="field-label">Запрос</span>
+
+      <div class="input-wrap">
+        <span class="input-icon" aria-hidden="true">⌕</span>
+        <input
+          class="input input--pretty"
+          type="text"
+          id="query_text"
+          name="query_text"
+          placeholder="Например: драка, огонь, человек в кадре..."
+          autocomplete="off"
+        >
+      </div>
+
+
+    </label>
+  </section>
+
+<section class="field-section">
+  <h3 class="field-title">Важная кнопочка</h3>
+  <p class="field-subtitle">Нажмите кнопку, чтобы отправить данные в обработку.</p>
+
+  <button class="btn btn-gap" type="submit">Применить</button>
+  <p class="footer-note">После нажатия начнётся обработка.</p>
+</section>
+
+</form>
+
+
+    <footer class="footer">
+      <span>Локально: 127.0.0.1</span>
+      <span class="dot">•</span>
+      <span>Версия: MVP</span>
+    </footer>
+  </main>
+
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
