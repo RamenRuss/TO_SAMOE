@@ -912,3 +912,58 @@ html, body { overflow-x: hidden; }
   opacity: 1;
 }
 
+/* result page: video left, timestamps right */
+.result-layout{
+  display:flex;
+  gap:16px;
+  align-items:flex-start;
+}
+
+.result-left{
+  flex: 1 1 auto;
+  min-width: 320px;
+}
+
+.result-right{
+  flex: 0 0 320px;
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 12px;
+  padding: 12px;
+  max-height: 640px;
+  overflow: auto;
+}
+
+.result-right-title{
+  margin-top: 0;
+}
+
+@media (max-width: 900px){
+  .result-layout{ flex-direction: column; }
+  .result-right{ flex-basis: auto; width: 100%; max-height: 260px; }
+}
+
+/* result: two separate cards side-by-side */
+.result-grid{
+  display: grid;
+  grid-template-columns: 1fr 340px; /* справа фикс ширина */
+  gap: 16px;
+  align-items: start;
+  margin-top: 16px;
+}
+
+.result-card-left{ min-width: 0; } /* чтобы видео не ломало сетку */
+
+.result-card-right{
+  max-height: 640px;
+  overflow: auto;
+}
+
+/* mobile */
+@media (max-width: 900px){
+  .result-grid{
+    grid-template-columns: 1fr;
+  }
+  .result-card-right{
+    max-height: 260px;
+  }
+}
