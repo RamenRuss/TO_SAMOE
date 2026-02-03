@@ -1,3 +1,11 @@
+# Web (Flask) entrypoint + VLM pipeline.
+#
+# ROI logic is the same as in main.py:
+# - ROI is applied during splitting (split_video_web crops segments)
+# - motion/person detectors run WITHOUT roi (they see already-cropped segments)
+
+from __future__ import annotations
+
 import os
 import sys
 import time
@@ -10,14 +18,36 @@ import tempfile
 import atexit
 import signal
 import mimetypes
+import json
+import re
+import warnings
+from dataclasses import asdict
 
 from flask import Flask, render_template, request, redirect, url_for, jsonify, send_file
 
-# Твои модули обработки
-from split_video import split_video_web
-from motion_detect import motion_detect
-from person_detect import person_detect
-from count_delete_video import delete_video
+# ---------- preprocessing (как в main.py) ----------
+from Utils import split_video_web
+from Utils import motion_detect
+from Utils import person_detect
+from Utils import delete_video
+
+# ---------- VLM ----------
+from translate import translate_ru_to_en
+from cache_io import ensure_all_cache_dirs
+from config import Config
+from models import create_backend
+from run_one_video import process_one_video
+
+# Disable HuggingFace symlinks warning on Windows (PyInstaller)
+os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
+warnings.filterwarnings("ignore", message="Recommended: pip install sacremoses.*")
+warnings.filterwarnings("ignore", message="Xet Storage is enabled for this repo.*")
+
+_CYRILLIC_RE = re.compile(r"[А-Яа-яЁё]")
+
+
+def has_cyrillic(text: str) -> bool:
+    return bool(_CYRILLIC_RE.search(text or ""))
 
 
 # -------------------- НАСТРОЙКИ (можешь менять) --------------------
@@ -26,8 +56,6 @@ MIN_MOTION_SECONDS = 3.0       # минимальная "движуха" в се
 PERSON_N_FRAMES = 8            # сколько кадров проверять на человека
 # ------------------------------------------------------------------
 
-
-import os, sys
 
 def resource_path(filename: str) -> str:
     # 1) onefile: внутри временной папки PyInstaller
@@ -46,7 +74,9 @@ def resource_path(filename: str) -> str:
     # 3) рядом с .py (режим разработки)
     return os.path.join(os.path.dirname(__file__), filename)
 
+
 weights_path = resource_path("yolo11s.pt")
+
 
 def is_frozen() -> bool:
     """True если запущено как PyInstaller exe."""
@@ -92,15 +122,16 @@ app = Flask(
 # job_id -> {
 #   "status": "await_roi" | "processing" | "done" | "error",
 #   "progress": int(0..100),
-#   "timestamps": list[float],  # секунды (старты сегментов которые прошли фильтры)
+#   "timestamps": list[float],  # секунды (старты VLM-top сегментов)
 #   "segments": list[(path, start_sec)],
 #   "temp_path": str,           # исходное видео (в temp)
 #   "roi": (x,y,w,h) | None,
+#   "query_text": str,
 #   "result": str,
 #   "error": str
 # }
 JOBS: dict[str, dict] = {}
-JOBS_LOCK = threading.Lock()  # чтобы поток обработки и веб-потоки не конфликтовали
+JOBS_LOCK = threading.Lock()
 
 # Чтобы пути были короткими — сохраняем сегменты в %TEMP%\dw\<id>\
 def _short_job_id(job_id: str) -> str:
@@ -117,7 +148,6 @@ _TEMP_DIRS: set[str] = set()
 
 
 def cleanup_temp() -> None:
-    # Удаляем загруженные видео
     for p in list(_TEMP_FILES):
         try:
             if os.path.isfile(p):
@@ -125,7 +155,6 @@ def cleanup_temp() -> None:
         except Exception:
             pass
 
-    # Удаляем папки с сегментами
     for d in list(_TEMP_DIRS):
         try:
             if os.path.isdir(d):
@@ -150,14 +179,70 @@ except Exception:
 # ----------------------------------------------------------
 
 
+# -------- backend cache (чтобы не грузить модель каждый раз) --------
+_BACKEND_LOCK = threading.Lock()
+_BACKEND = None
+_BACKEND_CFG_KEY = None
+
+
+def _get_backend(cfg: Config):
+    """
+    Lazy-load backend and reuse between jobs.
+    If model config changes (backend/model_name/device/dtype), reload.
+    """
+    global _BACKEND, _BACKEND_CFG_KEY
+    key = (
+        getattr(cfg.model, "backend", None),
+        getattr(cfg.model, "model_name", None),
+        getattr(cfg.model, "device", None),
+        getattr(cfg.model, "dtype", None),
+        getattr(cfg.model, "use_torch_compile", None),
+    )
+    with _BACKEND_LOCK:
+        if _BACKEND is None or _BACKEND_CFG_KEY != key:
+            _BACKEND = create_backend(cfg, load=True)
+            _BACKEND_CFG_KEY = key
+        return _BACKEND
+# -------------------------------------------------------------------
+
+
+def _make_manifest(
+    *,
+    source_video: str,
+    out_dir: str,
+    segment_seconds: float,
+    roi: tuple[int, int, int, int] | None,
+    kept: list[tuple[str, float]],
+    manifest_name: str = "segments_manifest.json",
+) -> str:
+    manifest_path = os.path.join(out_dir, manifest_name)
+    manifest = {
+        "source_video": os.path.abspath(source_video),
+        "segments_dir": os.path.abspath(out_dir),
+        "segment_seconds": float(segment_seconds),
+        "use_roi": bool(roi is not None),
+        "roi": list(roi) if roi is not None else None,
+        "segments": [
+            {"path": os.path.abspath(p), "start_time_sec": float(s)}
+            for (p, s) in kept
+        ],
+    }
+    with open(manifest_path, "w", encoding="utf-8") as f:
+        json.dump(manifest, f, ensure_ascii=False, indent=2)
+    return manifest_path
+
+
 def process_job(job_id: str) -> None:
     """
-    Фоновая обработка:
-    1) нарезка (split_video_web) -> all_segments: [(path, start_sec)]
-    2) поштучная проверка каждого сегмента (motion -> person)
-       если сегмент подходит — сразу добавляем start_sec в timestamps (чтобы UI показывал постепенно)
-    3) удаление ненужных сегментов delete_video(all, kept)
-    4) статус done/error
+    Фоновая обработка (WEB + VLM):
+
+    1) split_video_web(input, roi=roi) -> all_segments: [(path, start_sec)]
+       (ROI логика как в main.py: split режет и кропает сегменты)
+    2) motion_detect + person_detect на сегментах
+    3) delete_video(all, kept)
+    4) manifest.json для kept
+    5) VLM retrieve top-k по query_text через process_one_video(... presegmented_manifest_path=manifest)
+    6) job["timestamps"] = start_time_sec top-сегментов
     """
     with JOBS_LOCK:
         job = JOBS.get(job_id)
@@ -166,13 +251,23 @@ def process_job(job_id: str) -> None:
 
     try:
         src_video = job["temp_path"]
-        roi = job.get("roi")  # (x,y,w,h) в пикселях или None
+        roi = job.get("roi")
+        query_text = (job.get("query_text") or "").strip()
+
+        if not query_text:
+            raise ValueError("Пустой текстовый запрос (query_text).")
+
+        # RU -> EN (как в VLM cli)
+        if has_cyrillic(query_text):
+            q2 = translate_ru_to_en(query_text)
+            if q2:
+                query_text = q2
 
         out_dir = _job_dir(job_id)
         os.makedirs(out_dir, exist_ok=True)
         _TEMP_DIRS.add(out_dir)
 
-        # 1) Нарезка видео (ROI учитывается внутри split_video_web)
+        # 1) split (ROI как в main.py)
         all_segments = split_video_web(
             input_path=src_video,
             out_dir=out_dir,
@@ -194,7 +289,7 @@ def process_job(job_id: str) -> None:
         total = len(all_segments)
         kept: list[tuple[str, float]] = []
 
-        # 2) Поштучная фильтрация + постепенное добавление таймкодов
+        # 2) фильтры (ROI НЕ передаём, т.к. сегменты уже кропнуты при split)
         for i, (seg_path, start_sec) in enumerate(all_segments, start=1):
             ok_motion = motion_detect(seg_path, MIN_MOTION_SECONDS)
             ok_person = False
@@ -203,27 +298,62 @@ def process_job(job_id: str) -> None:
 
             if ok_motion and ok_person:
                 kept.append((seg_path, start_sec))
-                with JOBS_LOCK:
-                    job = JOBS.get(job_id)
-                    if job:
-                        job["timestamps"].append(float(start_sec))  # UI сразу увидит новый таймкод
 
-            # обновляем прогресс
+            # прогресс 0..60%
             with JOBS_LOCK:
                 job = JOBS.get(job_id)
                 if job:
-                    job["progress"] = int(i * 100 / total)
+                    job["progress"] = int(i * 60 / total)
 
-        # 3) Удаляем лишние сегменты, оставляем только kept
+        # 3) чистим
         delete_video(all_segments, kept, folder_path=out_dir)
 
-        # 4) Финализируем job
+        # 4) manifest
+        manifest_path = _make_manifest(
+            source_video=src_video,
+            out_dir=out_dir,
+            segment_seconds=SEGMENT_SECONDS,
+            roi=roi,
+            kept=kept,
+        )
+
+        # 5) VLM retrieve
+        with JOBS_LOCK:
+            job = JOBS.get(job_id)
+            if job:
+                job["progress"] = 70
+
+        cfg = Config()
+        # cache рядом с запуском (чтобы в exe было удобно)
+        cfg.paths.root_dir = os.path.join(runtime_dir(), "cache")
+        ensure_all_cache_dirs(cfg=cfg)
+
+        backend = _get_backend(cfg)
+
+        out = process_one_video(
+            video_path=src_video,
+            query=query_text,
+            backend=backend,
+            cfg=cfg,
+            cfg_full=asdict(cfg),
+            presegmented_manifest_path=manifest_path,
+        )
+
+        results_list = out.get("results_list") or []
+        timestamps = []
+        for r in results_list:
+            t = r.get("start_time_sec")
+            if t is None:
+                continue
+            timestamps.append(float(t))
+
+        # 6) финал
         with JOBS_LOCK:
             job = JOBS.get(job_id)
             if job:
                 job["segments"] = kept
-                job["timestamps"] = sorted([float(t) for t in job["timestamps"]])
-                job["result"] = f"Готово. Осталось сегментов: {len(kept)}"
+                job["timestamps"] = timestamps
+                job["result"] = f"Готово. Осталось сегментов: {len(kept)}. VLM top: {len(timestamps)}"
                 job["status"] = "done"
                 job["progress"] = 100
 
@@ -253,6 +383,8 @@ def run():
     if not file or not file.filename:
         return "Файл не выбран", 400
 
+    query_text = (request.form.get("query_text") or "").strip()
+
     ext = os.path.splitext(file.filename)[1].lower() or ".mp4"
     fd, temp_path = tempfile.mkstemp(prefix="dw_", suffix=ext)
     os.close(fd)
@@ -268,6 +400,7 @@ def run():
             "segments": [],
             "temp_path": temp_path,
             "roi": None,
+            "query_text": query_text,
             "result": "",
             "error": "",
         }
@@ -277,7 +410,6 @@ def run():
 
 @app.get("/roi/<job_id>")
 def roi(job_id: str):
-    """Страница выбора ROI."""
     with JOBS_LOCK:
         if job_id not in JOBS:
             return "Задача не найдена", 404
@@ -286,11 +418,6 @@ def roi(job_id: str):
 
 @app.post("/roi/<job_id>")
 def roi_submit(job_id: str):
-    """
-    Получаем ROI (x,y,w,h) из формы и запускаем обработку в фоне.
-    Сразу кидаем пользователя на /result/<job_id> (плеер),
-    где таймкоды будут появляться постепенно.
-    """
     with JOBS_LOCK:
         job = JOBS.get(job_id)
     if not job:
@@ -320,14 +447,11 @@ def roi_submit(job_id: str):
         job["error"] = ""
 
     threading.Thread(target=process_job, args=(job_id,), daemon=True).start()
-
-    # ВАЖНО: сразу на плеер/результаты
     return redirect(url_for("result", job_id=job_id))
 
 
 @app.get("/result/<job_id>")
 def result(job_id: str):
-    """Плеер/страница результатов. Может быть processing/done/error."""
     with JOBS_LOCK:
         job = JOBS.get(job_id)
         if not job:
@@ -337,7 +461,6 @@ def result(job_id: str):
 
 @app.get("/api/job/<job_id>")
 def api_job(job_id: str):
-    """API для фронта: статус, прогресс и текущие таймкоды (постепенно пополняются)."""
     with JOBS_LOCK:
         job = JOBS.get(job_id)
         if not job:
@@ -354,7 +477,6 @@ def api_job(job_id: str):
 
 @app.get("/video/<job_id>")
 def video(job_id: str):
-    """Отдаём исходное видео для просмотра на roi/result страницах."""
     with JOBS_LOCK:
         job = JOBS.get(job_id)
     if not job:
@@ -368,7 +490,6 @@ def video(job_id: str):
     return send_file(path, mimetype=mime or "video/mp4", conditional=True)
 
 
-# (опционально) старый /processing и /api/status можно оставить, но сейчас не нужен.
 @app.get("/processing/<job_id>")
 def processing(job_id: str):
     with JOBS_LOCK:
