@@ -967,3 +967,35 @@ html, body { overflow-x: hidden; }
     max-height: 260px;
   }
 }
+
+.btn:disabled{
+  opacity: .5;
+  cursor: not-allowed;
+}
+/* pagination button */
+.tc-more{
+  width: 100%;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,.10);
+  background: rgba(255,255,255,.04);
+  color: inherit;
+  cursor: pointer;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+
+  transition: transform .18s ease, background .18s ease, opacity .18s ease;
+}
+
+.tc-more:hover{ background: rgba(255,255,255,.07); }
+.tc-more:active{ transform: translateY(1px); }
+
+.tc-more__arrow{
+  display:inline-block;
+  transition: transform .25s ease;
+}
+

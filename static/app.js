@@ -11,7 +11,20 @@ function initFilePickerUI() {
   const input = document.getElementById("video_file");
   const nameEl = document.getElementById("file_name");
   const btn = document.getElementById("file_btn");
+  const query = document.getElementById("query_text");
+  const submitBtn = document.querySelector("form[action='/run'] button[type='submit'], form[action='/run'] input[type='submit']");
   if (!input || !nameEl || !btn) return;
+
+  // Блокируем кнопку "Применить", пока не выбран файл И не введён текст
+  const updateSubmit = () => {
+    if (!submitBtn || !query) return;
+    const hasFile = !!(input.files && input.files[0]);
+    const hasText = (query.value || "").trim().length > 0;
+    const ok = hasFile && hasText;
+    submitBtn.disabled = !ok;
+    submitBtn.classList.toggle("is-disabled", !ok);
+  };
+
 
   const update = () => {
     const f = input.files && input.files[0];
@@ -26,8 +39,10 @@ function initFilePickerUI() {
     }
   };
 
-  input.addEventListener("change", update);
+  input.addEventListener("change", () => { update(); updateSubmit(); });
+  if (query) query.addEventListener("input", updateSubmit);
   update();
+  updateSubmit();
 }
 
 /* -------------------- Helpers -------------------- */
