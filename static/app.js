@@ -25,7 +25,6 @@ function initFilePickerUI() {
     submitBtn.classList.toggle("is-disabled", !ok);
   };
 
-
   const update = () => {
     const f = input.files && input.files[0];
     if (f) {
@@ -50,6 +49,19 @@ function clamp(n, a, b) {
   return Math.min(b, Math.max(a, n));
 }
 
+
+function scoreToText(sc) {
+  const n = Number(sc);
+  if (!Number.isFinite(n)) return "—";
+
+  // если вероятность 0..1 — показываем как %
+  if (n >= 0 && n <= 1) return `${(n * 100).toFixed(1)}%`;
+
+  // иначе просто число
+  return n.toFixed(3);
+}
+
+
 function formatTime(sec) {
   sec = Math.max(0, Number(sec) || 0);
   const s = Math.floor(sec % 60);
@@ -61,6 +73,7 @@ function formatTime(sec) {
   return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
 }
 
+// оставил как было (может понадобиться в других местах)
 function normalizeMarkers(arr) {
   return (arr || [])
     .map((x) => Number(x))
@@ -74,7 +87,22 @@ function markersEqual(a, b) {
   return true;
 }
 
-/* -------------------- RESULT: live markers + progress -------------------- */
+// Нормализация БЕЗ сортировки (важно для "по вероятности")
+function keepOrderUnique(arr) {
+  const out = [];
+  const seen = new Set();
+  for (const x of (arr || [])) {
+    const n = Number(x);
+    if (!Number.isFinite(n) || n < 0) continue;
+    const key = String(n);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(n);
+  }
+  return out;
+}
+
+/* -------------------- RESULT: TOP-20 по вероятности + 2 колонки -------------------- */
 function initResultPageLive() {
   const page = document.querySelector("[data-page='result']");
   if (!page) return;
@@ -95,56 +123,78 @@ function initResultPageLive() {
 
   if (!listEl || !video || !seek || !curEl || !durEl || !markerLayer) return;
 
+
+  const TOP_N = 20;
+
+  // scoreMap: time(sec) -> score (если бэкенд отдаёт top_items)
+  let scoreMap = new Map();
+
+  // markers: TOP-20 по вероятности (порядок как пришёл)
   let markers = [];
+
+  // начальные таймкоды (из result.html data-markers)
   try {
     markers = JSON.parse(page.getAttribute("data-markers") || "[]");
   } catch {
     markers = [];
   }
-  markers = normalizeMarkers(markers);
+  markers = keepOrderUnique(markers).slice(0, TOP_N);
 
   function jumpTo(t) {
-    if (!Number.isFinite(t)) return;
+    const tt = Number(t);
+    if (!Number.isFinite(tt)) return;
     const dur = video.duration || 0;
-    if (dur > 0) video.currentTime = clamp(t, 0, dur);
-    else video.currentTime = Math.max(0, t);
+    if (dur > 0) video.currentTime = clamp(tt, 0, dur);
+    else video.currentTime = Math.max(0, tt);
     video.play?.();
   }
 
-  function renderList() {
-    listEl.innerHTML = "";
-
-    if (markers.length === 0) {
+function renderList() {
+  // 1) если таймкодов нет — показываем плейсхолдер
+  if (!markers || markers.length === 0) {
+    // не дублируем плейсхолдер
+    if (!listEl.querySelector(".tc-placeholder")) {
+      listEl.innerHTML = "";
       const li = document.createElement("li");
-      li.className = "tc-item";
+      li.className = "tc-item tc-placeholder";
       li.textContent = "Пока нет таймкодов…";
       listEl.appendChild(li);
-      return;
     }
-
-    for (const t of markers) {
-      const li = document.createElement("li");
-      li.className = "tc-item";
-
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "tc-btn";
-      btn.addEventListener("click", () => jumpTo(t));
-
-      const timeSpan = document.createElement("span");
-      timeSpan.className = "tc-time";
-      timeSpan.textContent = formatTime(t);
-
-      const hintSpan = document.createElement("span");
-      hintSpan.className = "tc-jump";
-      hintSpan.textContent = "перейти ↗";
-
-      btn.appendChild(timeSpan);
-      btn.appendChild(hintSpan);
-      li.appendChild(btn);
-      listEl.appendChild(li);
-    }
+    return;
   }
+
+  // 2) если таймкоды появились — убираем плейсхолдер и рисуем список
+  if (listEl.querySelector(".tc-placeholder")) {
+    listEl.innerHTML = "";
+  } else {
+    listEl.innerHTML = "";
+  }
+
+  for (const t of markers) {
+    const li = document.createElement("li");
+    li.className = "tc-item";
+
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "tc-btn";
+    btn.addEventListener("click", () => jumpTo(t));
+
+    const left = document.createElement("span");
+    left.className = "tc-time";
+    left.textContent = formatTime(t);
+
+    const right = document.createElement("span");
+    right.className = "tc-score";
+    const sc = scoreMap.get(String(Number(t)));
+    right.textContent = scoreToText(sc);
+
+    btn.appendChild(left);
+    btn.appendChild(right);
+    li.appendChild(btn);
+    listEl.appendChild(li);
+  }
+}
+
 
   function renderMarkers() {
     const dur = video.duration || 0;
@@ -201,6 +251,31 @@ function initResultPageLive() {
     syncUI();
   }
 
+  // Вытаскиваем TOP-20 по вероятности:
+  // 1) если есть data.top_items = [{t: ..., score: ...}, ...] — берём их как есть
+  // 2) иначе берём data.timestamps (как есть, но без сортировки) и режем до 20
+  function extractTop20(data) {
+    scoreMap = new Map();
+
+    const items = Array.isArray(data.top_items) ? data.top_items : [];
+    if (items.length) {
+      const times = [];
+      for (const it of items) {
+        if (!it) continue;
+        const t = Number(it.t);
+        if (!Number.isFinite(t) || t < 0) continue;
+        times.push(t);
+
+        const sc = Number(it.score);
+        if (Number.isFinite(sc)) scoreMap.set(String(t), sc);
+      }
+      return keepOrderUnique(times).slice(0, TOP_N);
+    }
+
+    const ts = Array.isArray(data.timestamps) ? data.timestamps : [];
+    return keepOrderUnique(ts).slice(0, TOP_N);
+  }
+
   // live polling /api/job/<id>
   let stopped = false;
 
@@ -214,7 +289,8 @@ function initResultPageLive() {
 
       const st = data.status || "processing";
       const prog = Number(data.progress);
-      const nextMarkers = normalizeMarkers(data.timestamps || []);
+
+      const nextMarkers = extractTop20(data);
 
       // статусные тексты
       if (st === "error") {
@@ -227,16 +303,16 @@ function initResultPageLive() {
 
       if (st === "done") {
         if (statusTextEl) statusTextEl.textContent = "Обработка закончена ✅";
-        if (statusSubEl) statusSubEl.textContent = "Таймкоды отмечены на таймлайне. Можно переходить по списку.";
+        if (statusSubEl) statusSubEl.textContent = "Показаны TOP-20 таймкодов по вероятности. Можно переходить по списку.";
         if (progressEl) progressEl.textContent = "100%";
         stopped = true;
       } else {
         if (statusTextEl) statusTextEl.textContent = "Идёт обработка…";
-        if (statusSubEl) statusSubEl.textContent = "Первые таймкоды появятся по мере готовности.";
+        if (statusSubEl) statusSubEl.textContent = "Таймкоды появятся после завершения VLM.";
         if (progressEl) progressEl.textContent = `${Number.isFinite(prog) ? prog : 0}%`;
       }
 
-      // таймкоды (постепенно)
+      // таймкоды: только TOP-20, порядок = вероятность
       if (!markersEqual(markers, nextMarkers)) {
         markers = nextMarkers;
         renderList();

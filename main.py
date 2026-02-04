@@ -16,6 +16,7 @@ import threading
 import webbrowser
 import tempfile
 import atexit
+import inspect
 import signal
 import mimetypes
 import json
@@ -330,7 +331,24 @@ def process_job(job_id: str) -> None:
 
         backend = _get_backend(cfg)
 
-        out = process_one_video(
+        TOP_K = 20  # <-- нужно TOP-20
+
+        # попробуем установить top_k в cfg, если такое поле есть
+        try:
+            if hasattr(cfg, "retrieval") and hasattr(cfg.retrieval, "top_k"):
+                cfg.retrieval.top_k = TOP_K
+        except Exception:
+            pass
+
+        for attr in ("top_k", "topk", "k"):
+            if hasattr(cfg, attr):
+                try:
+                    setattr(cfg, attr, TOP_K)
+                except Exception:
+                    pass
+
+        # безопасно передаём top_k в process_one_video (если параметр существует)
+        call_kwargs = dict(
             video_path=src_video,
             query=query_text,
             backend=backend,
@@ -339,20 +357,64 @@ def process_job(job_id: str) -> None:
             presegmented_manifest_path=manifest_path,
         )
 
+        sig = inspect.signature(process_one_video)
+        if "top_k" in sig.parameters:
+            call_kwargs["top_k"] = TOP_K
+        elif "topk" in sig.parameters:
+            call_kwargs["topk"] = TOP_K
+        elif "k" in sig.parameters:
+            call_kwargs["k"] = TOP_K
+
+        out = process_one_video(**call_kwargs)
+
         results_list = out.get("results_list") or []
-        timestamps = []
-        for r in results_list:
+
+        def _extract_score(rec: dict):
+            # подстрой, если у тебя другой ключ точности
+            for k in ("score", "probability", "prob", "confidence", "sim", "similarity"):
+                v = rec.get(k)
+                if v is None:
+                    continue
+                try:
+                    return float(v)
+                except Exception:
+                    pass
+            return None
+
+        # time -> max_score (если таймкод повторяется, берём лучший score)
+        best = {}
+        for idx_r, r in enumerate(results_list):
             t = r.get("start_time_sec")
             if t is None:
                 continue
-            timestamps.append(float(t))
+            try:
+                t = float(t)
+            except Exception:
+                continue
+
+            sc = _extract_score(r)
+            if sc is None:
+                # fallback, если score нет: чем раньше в results_list — тем выше "вес"
+                sc = float(len(results_list) - idx_r)
+
+            prev = best.get(t)
+            if prev is None or sc > prev:
+                best[t] = sc
+
+        # TOP-20 по score (по убыванию), НЕ по времени
+        top_items = sorted(best.items(), key=lambda x: x[1], reverse=True)[:TOP_K]
+        timestamps = [t for (t, _sc) in top_items]
+
+        # (опционально) сохраним scores, если захочешь показывать проценты на фронте
+        top_items_payload = [{"t": t, "score": sc} for (t, sc) in top_items]
 
         # 6) финал
         with JOBS_LOCK:
             job = JOBS.get(job_id)
             if job:
                 job["segments"] = kept
-                job["timestamps"] = timestamps
+                job["timestamps"] = timestamps #optional
+                job['top_items'] = top_items_payload
                 job["result"] = f"Готово. Осталось сегментов: {len(kept)}. VLM top: {len(timestamps)}"
                 job["status"] = "done"
                 job["progress"] = 100
@@ -472,6 +534,7 @@ def api_job(job_id: str):
             "timestamps": job.get("timestamps", []),
             "result": job.get("result", ""),
             "error": job.get("error", ""),
+            "top_items": job.get("top_items", []),
         })
 
 

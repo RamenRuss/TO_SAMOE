@@ -998,4 +998,40 @@ html, body { overflow-x: hidden; }
   display:inline-block;
   transition: transform .25s ease;
 }
+/* TOP-20 в два столбика */
+/* TOP-20: 2 столбца сверху-вниз (1..10 слева, 11..20 справа) */
+.tc-list{
+  display: grid !important;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: repeat(10, min-content);
+  grid-auto-flow: column;
+  row-gap: 10px;
+  column-gap: 18px;
 
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  position: relative;
+}
+
+/* разделитель между столбцами */
+.tc-list::before{
+  content:"";
+  position:absolute;
+  top:0; bottom:0;
+  left:50%;
+  width:1px;
+  transform: translateX(-0.5px);
+  background: rgba(255,255,255,0.12);
+  pointer-events:none;
+}
+
+/* на телефоне — один столбец */
+@media (max-width: 700px){
+  .tc-list{
+    grid-template-columns: 1fr;
+    grid-template-rows: none;
+    grid-auto-flow: row;
+  }
+  .tc-list::before{ display:none; }
+}
