@@ -1,8 +1,14 @@
+from __future__ import annotations
 import cv2
 import math
 import os
 from ultralytics import YOLO
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Any, Dict, List
+from functools import lru_cache
+import torch
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from dataclasses import dataclass
+import numpy as np
 
 
 def _clip_roi(roi: Tuple[int, int, int, int], frame_w: int, frame_h: int) -> Tuple[int, int, int, int]: #нужна для motion_detect
@@ -547,3 +553,244 @@ def split_video_web(
     cap.release()
 
     return segments
+
+def pick(value: Any, cfg: Optional[object], attr_path: str, default: Any) -> Any:
+    """Утилита для выбора значения из:
+    1) явного аргумента (если не None)
+    2) cfg по пути attr_path (например "clip_len_frames" или "paths.index_dir")
+    3) default
+
+    Это сделано, чтобы функции можно было вызывать и с cfg, и с явными параметрами
+    (удобно для экспериментов и тестов).
+    """
+
+    if value is not None:
+        return value
+    if cfg is None:
+        return default
+
+    cur: Any = cfg
+    for part in attr_path.split("."):
+        if not hasattr(cur, part):
+            return default
+        cur = getattr(cur, part)
+    return cur
+
+_MODEL_NAME = "Helsinki-NLP/opus-mt-ru-en"
+
+@lru_cache(maxsize=1)
+def _load_model(device: Optional[str] = None):
+    """
+    Lazily load tokenizer + model once per process.
+    """
+    tokenizer = AutoTokenizer.from_pretrained(_MODEL_NAME)
+    model = AutoModelForSeq2SeqLM.from_pretrained(_MODEL_NAME)
+
+    if device is None:
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+    model = model.to(device)
+    model.eval()
+    return tokenizer, model, device
+
+
+def translate_ru_to_en(text: str, *, max_new_tokens: int = 64) -> str:
+    """
+    Translate RU -> EN. Intended for short user queries.
+
+    Args:
+        text: input Russian text.
+        max_new_tokens: generation length cap.
+
+    Returns:
+        English translation (best-effort). If translation fails, returns original text.
+    """
+    s = (text or "").strip()
+    if not s:
+        return s
+
+    try:
+        tokenizer, model, device = _load_model()
+        inputs = tokenizer([s], return_tensors="pt", padding=True, truncation=True).to(device)
+        with torch.inference_mode():
+            out = model.generate(
+                **inputs,
+                max_new_tokens=max_new_tokens,
+                num_beams=4,
+                early_stopping=True,
+            )
+        return tokenizer.batch_decode(out, skip_special_tokens=True)[0].strip()
+    except Exception:
+        # Safe fallback: do not break retrieval if translation fails.
+        return s
+
+
+def cosine_sim_matrix(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
+    """Cosine sim for normalized vectors; if not normalized, it still works but scales vary."""
+    return a @ b.T
+
+
+def frames_to_time(frame_idx: int, fps: Optional[float]) -> Optional[float]:
+    if fps is None or fps <= 0:
+        return None
+    return float(frame_idx) / float(fps)
+
+
+def retrieve_topk_segments(
+    index: Dict[str, Any],
+    backend: Any,
+    query_text: str,
+    *,
+    top_k: Optional[int] = None,
+    normalize_embeddings: Optional[bool] = None,
+    text_emb: Optional[torch.Tensor] = None,
+    cfg: Optional[object] = None,
+) -> List[Dict[str, Any]]:
+    """Возвращает top-k сегментов (по клипам) для query_text.
+
+    Оптимизация для batch:
+    - Можно передать заранее посчитанный text_emb (shape [1, D]) и не считать его для каждого видео.
+    """
+
+    top_k = int(pick(top_k, cfg, "top_k", 5))
+    normalize_embeddings = bool(pick(normalize_embeddings, cfg, "normalize_embeddings", True))
+
+    # 1) text embedding
+    if text_emb is None:
+        text_emb = backend.encode_text([query_text], normalize=normalize_embeddings)  # [1,D]
+    else:
+        if text_emb.dim() != 2 or text_emb.shape[0] != 1:
+            raise ValueError("text_emb must be [1,D]")
+
+    # 2) similarity
+    video_embs: torch.Tensor = index["embeddings"]
+    if not isinstance(video_embs, torch.Tensor):
+        raise TypeError("index['embeddings'] must be torch.Tensor")
+
+    if video_embs.numel() == 0 or video_embs.shape[0] == 0:
+        return []
+
+    # считаем similarity на device, где text_emb (обычно backend.device)
+    video_embs = video_embs.to(text_emb.device)
+    sims = cosine_sim_matrix(text_emb, video_embs)[0]  # [C]
+
+    k = min(top_k, int(sims.numel()))
+    vals, idxs = torch.topk(sims, k=k)
+
+    fps = index.get("fps", None)
+    results: List[Dict[str, Any]] = []
+    for score, clip_i in zip(vals.tolist(), idxs.tolist()):
+        s, e = index["ranges"][clip_i]
+        results.append(
+            {
+                "rank": len(results) + 1,
+                "score": float(score),
+                "start_frame": int(s),
+                "end_frame": int(e),
+                "start_time_sec": frames_to_time(s, fps),
+                "end_time_sec": frames_to_time(e, fps),
+                "segment_path": (index.get("segment_paths")[clip_i] if isinstance(index.get("segment_paths"), list) and clip_i < len(index.get("segment_paths")) else None),
+            }
+        )
+    return results
+
+
+def _try_import_decord():
+    try:
+        import decord
+        from decord import VideoReader
+        return decord, VideoReader
+    except Exception as e:
+        raise ImportError(
+            "Не найден decord. Установи: pip install decord\n"
+            f"Текущая ошибка: {e}"
+        )
+
+
+@dataclass
+class VideoSource:
+    """Обёртка над decord.VideoReader с удобным batch API."""
+
+    video_path: str
+    fps_hint: Optional[float] = None
+
+    def __post_init__(self) -> None:
+        decord, VideoReader = _try_import_decord()
+        # context по умолчанию cpu; можно расширить под gpu позже
+        self._decord = decord
+        self._vr = VideoReader(self.video_path)
+
+        self.num_frames: int = len(self._vr)
+
+        fps: Optional[float] = None
+        try:
+            fps = float(self._vr.get_avg_fps())
+        except Exception:
+            fps = self.fps_hint
+
+        self.fps: Optional[float] = fps
+
+    def get_frames(self, frame_indices: List[int]) -> np.ndarray:
+        """Возвращает RGB uint8 кадры [T,H,W,3] по индексам."""
+
+        if self.num_frames <= 0:
+            return np.zeros((0, 0, 0, 3), dtype=np.uint8)
+
+        max_idx = self.num_frames - 1
+        safe_idx = [min(max(int(i), 0), max_idx) for i in frame_indices]
+        frames = self._vr.get_batch(safe_idx).asnumpy()  # [T,H,W,3] uint8 RGB
+        return frames
+
+
+# ----------------------------
+# Backward-compatible helpers
+# ----------------------------
+
+def open_video(video_path: str, fps_hint: Optional[float] = None) -> VideoSource:
+    return VideoSource(video_path=video_path, fps_hint=fps_hint)
+
+
+def read_video_metadata(video_path: str, fps_hint: Optional[float] = None) -> dict:
+    vs = open_video(video_path, fps_hint=fps_hint)
+    return {"num_frames": vs.num_frames, "fps": vs.fps}
+
+
+def read_frames(video_path: str, frame_indices: List[int]) -> np.ndarray:
+    """Старый API (медленный, т.к. открывает VideoReader каждый вызов).
+
+    Оставлен для совместимости (визуализация).
+    В индексации использовать VideoSource.
+    """
+
+    vs = open_video(video_path)
+    return vs.get_frames(frame_indices)
+
+
+# ----------------------------
+# Sampling / clips
+# ----------------------------
+
+def sample_indices_uniform(start: int, end: int, num: int) -> List[int]:
+    """Uniform sample `num` indices in [start, end) (end exclusive)."""
+
+    if end <= start:
+        return [start] * num
+    if num == 1:
+        return [start]
+    lin = np.linspace(start, end - 1, num=num)
+    return [int(round(x)) for x in lin]
+
+
+def build_clips(frame_count: int, clip_len: int, stride: int) -> List[Tuple[int, int]]:
+    """Возвращает список клипов как (start_frame, end_frame_exclusive)."""
+
+    clips: List[Tuple[int, int]] = []
+    start = 0
+    while start < frame_count:
+        end = start + clip_len
+        if end > frame_count:
+            end = frame_count
+        clips.append((start, end))
+        if start + stride >= frame_count:
+            break
+        start += stride
+    return clips

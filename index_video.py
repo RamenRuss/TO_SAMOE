@@ -7,9 +7,9 @@ from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 import torch
 
-from defaults import pick
+from Utils import pick
 from models.base import BaseVideoTextBackend
-from video_io import open_video, sample_indices_uniform, build_clips
+from Utils import open_video, sample_indices_uniform, build_clips
 
 
 def index_video_segments(

@@ -21,7 +21,7 @@ from cache_io import (
     results_matches_cfg,
 )
 from index_video import index_video_segments, index_presegmented_manifest
-from retrieve import retrieve_topk_segments
+from Utils import retrieve_topk_segments
 from models.base import BaseVideoTextBackend
 
 

@@ -33,7 +33,7 @@ from Utils import person_detect
 from Utils import delete_video
 
 # ---------- VLM ----------
-from translate import translate_ru_to_en
+from Utils import translate_ru_to_en
 from cache_io import ensure_all_cache_dirs
 from config import Config
 from models import create_backend
